@@ -2,6 +2,10 @@ import type { Dispatch } from "@reduxjs/toolkit";
 import type { Message } from "core/protocol/messenger";
 
 import {
+  MirrorActionKey,
+  MirrorActionMessage,
+  MirrorActionPayloadMap,
+  REDUX_MIRROR_ACTION_EVENT,
   REDUX_MIRROR_ALLOWED_COMMANDS,
   REDUX_MIRROR_COMMAND_EVENT,
   REDUX_MIRROR_COMMAND_RESPONSE_EVENT,
@@ -33,6 +37,11 @@ let mirrorActive = detectMirrorInstance();
 let shouldReconnect = true;
 const pendingMessages: string[] = [];
 
+type OutboundMirrorMessage = {
+  type: string;
+  payload: unknown;
+};
+
 const buildSocketUrl = (): string => {
   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
   const host = window.location.hostname || "localhost";
@@ -49,6 +58,15 @@ const flushPendingMessages = (): void => {
       socket.send(serialized);
     }
   }
+};
+
+const enqueueMirrorMessage = (message: OutboundMirrorMessage): void => {
+  const serialized = JSON.stringify(message);
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(serialized);
+    return;
+  }
+  pendingMessages.push(serialized);
 };
 
 const dispatchMirrorState = (
@@ -144,20 +162,35 @@ export function sendMirrorCommand(message: Message): boolean {
     return true;
   }
 
-  const serialized = JSON.stringify({
+  enqueueMirrorMessage({
     type: REDUX_MIRROR_COMMAND_EVENT,
     payload: message,
   });
-
-  if (socket && socket.readyState === WebSocket.OPEN) {
-    socket.send(serialized);
-  } else {
-    pendingMessages.push(serialized);
-  }
 
   return true;
 }
 
 export function isMirrorInstance(): boolean {
   return mirrorActive;
+}
+
+export function sendMirrorAction<T extends MirrorActionKey>(
+  key: T,
+  payload: MirrorActionPayloadMap[T],
+): boolean {
+  if (!mirrorActive) {
+    return false;
+  }
+
+  const message: MirrorActionMessage<T> = {
+    key,
+    payload,
+  };
+
+  enqueueMirrorMessage({
+    type: REDUX_MIRROR_ACTION_EVENT,
+    payload: message,
+  });
+
+  return true;
 }

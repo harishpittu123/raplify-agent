@@ -41,7 +41,10 @@ import { FileSearch } from "../util/FileSearch";
 import { VsCodeIdeUtils } from "../util/ideUtils";
 import { VsCodeIde } from "../VsCodeIde";
 
-import { ReduxMirrorBridge } from "../bridge/ReduxMirrorBridge";
+import {
+  MirrorActionMessage,
+  ReduxMirrorBridge,
+} from "../bridge/ReduxMirrorBridge";
 import { ConfigYamlDocumentLinkProvider } from "./ConfigYamlDocumentLinkProvider";
 import { VsCodeMessenger } from "./VsCodeMessenger";
 
@@ -267,16 +270,21 @@ export class VsCodeExtension {
       reduxMirrorBridge,
     );
 
-    reduxMirrorBridge?.onCommand((incomingMessage, respond) => {
-      //   void this.sidebar.webviewProtocol
-      //     .handleExternalMessage(incomingMessage, (response) => {
-      //       respond(response);
-      //     })
-      //     .catch((error) => {
-      //       console.error("Failed to handle mirror command", error);
-      //     });
-    });
+    if (reduxMirrorBridge) {
+      reduxMirrorBridge.onCommand((incomingMessage, respond) => {
+        void this.sidebar.webviewProtocol
+          .handleExternalMessage(incomingMessage, (response) => {
+            respond(response);
+          })
+          .catch((error) => {
+            console.error("Failed to handle mirror command", error);
+          });
+      });
 
+      reduxMirrorBridge.onAction((action: MirrorActionMessage) => {
+        this.sidebar.webviewProtocol.send(action.key, action.payload);
+      });
+    }
     // Sidebar
     context.subscriptions.push(
       vscode.window.registerWebviewViewProvider(

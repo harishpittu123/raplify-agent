@@ -4,6 +4,8 @@ import { InputModifiers } from "core";
 import posthog from "posthog-js";
 import { v4 as uuidv4 } from "uuid";
 import { resolveEditorContent } from "../../components/mainInput/TipTapEditor/utils/resolveEditorContent";
+import { MirrorActionKey } from "../../mirror/constants";
+import { sendMirrorAction } from "../../mirror/mirrorBridgeClient";
 import { selectSelectedChatModel } from "../slices/configSlice";
 import {
   resetNextCodeBlockToApplyIndex,
@@ -26,6 +28,16 @@ export const streamResponseThunk = createAsyncThunk<
 >(
   "chat/streamResponse",
   async ({ editorState, modifiers, index }, { dispatch, extra, getState }) => {
+    if (
+      sendMirrorAction(MirrorActionKey.Enter, {
+        editorState,
+        modifiers,
+        index,
+      })
+    ) {
+      return;
+    }
+
     await dispatch(
       streamThunkWrapper(async () => {
         const state = getState();

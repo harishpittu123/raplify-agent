@@ -67,119 +67,10 @@ export class VsCodeWebviewProtocol
     this._webview = webView;
     this._webviewListener?.dispose();
 
-    const handleMessage = async (msg: Message): Promise<void> => {
-      if (!("messageType" in msg) || !("messageId" in msg)) {
-        throw new Error(`Invalid webview protocol msg: ${JSON.stringify(msg)}`);
-      }
-      if (msg.messageType === "mirror/redux-root") {
-        const payload = msg.data as ReduxMirrorPayload | undefined;
-        const parsedState = parseMirrorState(payload?.state);
-        const topLevelKeys =
-          parsedState && typeof parsedState === "object"
-            ? Object.keys(parsedState as Record<string, unknown>)
-            : [];
-        console.log(
-          `[mirror/redux-root] action=${payload?.actionType ?? "unknown"} keys=${topLevelKeys.join(", ")}`,
-          parsedState,
-        );
-        this.mirrorBridge?.broadcast(REDUX_MIRROR_EVENT, {
-          actionType: payload?.actionType ?? "unknown",
-          state: parsedState,
-        });
-      }
-
-      const respond = (message: any) =>
-        this.send(msg.messageType, message, msg.messageId);
-
-      const handlers =
-        this.listeners.get(msg.messageType as keyof FromWebviewProtocol) || [];
-      for (const handler of handlers) {
-        try {
-          const response = await handler(msg);
-          // For generator types e.g. llm/streamChat
-          if (
-            response &&
-            typeof response[Symbol.asyncIterator] === "function"
-          ) {
-            let next = await response.next();
-            while (!next.done) {
-              respond({
-                done: false,
-                content: next.value,
-                status: "success",
-              });
-              next = await response.next();
-            }
-            respond({
-              done: true,
-              content: next.value,
-              status: "success",
-            });
-          } else {
-            respond({ done: true, content: response, status: "success" });
-          }
-        } catch (e: any) {
-          if (await handleLLMError(e)) {
-            // Respond without an error, so the UI doesn't show the error component
-            respond({ done: true, status: "error" });
-          }
-          let message = e.message;
-          respond({ done: true, error: message, status: "error" });
-
-          const stringified = JSON.stringify({ msg }, null, 2);
-          console.error(
-            `Error handling webview message: ${stringified}\n\n${e}`,
-          );
-
-          if (
-            stringified.includes("llm/streamChat") ||
-            stringified.includes("chatDescriber/describe")
-          ) {
-            return;
-          }
-
-          if (e.cause) {
-            if (e.cause.name === "ConnectTimeoutError") {
-              message = `Connection timed out. If you expect it to take a long time to connect, you can increase the timeout in your config by setting "requestOptions": { "timeout": 10000 }. You can find the full config reference here: https://docs.continue.dev/reference/config`;
-            } else if (e.cause.code === "ECONNREFUSED") {
-              message = `Connection was refused. This likely means that there is no server running at the specified URL. If you are running your own server you may need to set the "apiBase" parameter in config.json. For example, you can set up an OpenAI-compatible server like here: https://docs.continue.dev/reference/Model%20Providers/openai#openai-compatible-servers--apis`;
-            } else {
-              message = `The request failed with "${e.cause.name}": ${e.cause.message}. If you're having trouble setting up Continue, please see the troubleshooting guide for help.`;
-            }
-          }
-
-          if (message.includes("https://proxy-server")) {
-            message = message.split("\n").filter((l: string) => l !== "")[1];
-            try {
-              message = JSON.parse(message).message;
-            } catch {}
-            if (message.includes("exceeded")) {
-              message +=
-                " To keep using Continue, you can set up a local model or use your own API key.";
-            }
-
-            vscode.window
-              .showInformationMessage(message, "Add API Key", "Use Local Model")
-              .then((selection) => {
-                if (selection === "Add API Key") {
-                  this.request("setupApiKey", undefined);
-                } else if (selection === "Use Local Model") {
-                  this.request("setupLocalConfig", undefined);
-                }
-              });
-          } else {
-            Telemetry.capture(
-              "webview_protocol_error",
-              {
-                messageType: msg.messageType,
-                errorMsg: message.split("\n\n")[0],
-                stack: extractMinimalStackTraceInfo(e.stack),
-              },
-              false,
-            );
-          }
-        }
-      }
+    const handleMessage = (msg: Message): void => {
+      void this.processMessage(msg).catch((error) => {
+        console.error("Error handling webview message", error);
+      });
     };
 
     this._webviewListener = this._webview.onDidReceiveMessage(handleMessage);
@@ -234,5 +125,134 @@ export class VsCodeWebviewProtocol
         resolve(undefined);
       }
     });
+  }
+
+  public async handleExternalMessage(
+    msg: Message,
+    responder?: (message: Message) => void,
+  ): Promise<void> {
+    await this.processMessage(msg, responder);
+  }
+
+  private async processMessage(
+    msg: Message,
+    responder?: (message: Message) => void,
+  ): Promise<void> {
+    if (!("messageType" in msg) || !("messageId" in msg)) {
+      throw new Error(`Invalid webview protocol msg: ${JSON.stringify(msg)}`);
+    }
+    if (msg.messageType === "mirror/redux-root") {
+      const payload = msg.data as ReduxMirrorPayload | undefined;
+      const parsedState = parseMirrorState(payload?.state);
+      const topLevelKeys =
+        parsedState && typeof parsedState === "object"
+          ? Object.keys(parsedState as Record<string, unknown>)
+          : [];
+      console.log(
+        `[mirror/redux-root] action=${payload?.actionType ?? "unknown"} keys=${topLevelKeys.join(", ")}`,
+        parsedState,
+      );
+      this.mirrorBridge?.broadcast(REDUX_MIRROR_EVENT, {
+        actionType: payload?.actionType ?? "unknown",
+        state: parsedState,
+      });
+    }
+
+    const respond = (message: any) => {
+      if (responder) {
+        responder({
+          messageType: msg.messageType,
+          messageId: msg.messageId,
+          data: message,
+        });
+        return;
+      }
+      this.send(msg.messageType, message, msg.messageId);
+    };
+
+    const handlers =
+      this.listeners.get(msg.messageType as keyof FromWebviewProtocol) || [];
+    for (const handler of handlers) {
+      try {
+        const response = await handler(msg);
+        // For generator types e.g. llm/streamChat
+        if (response && typeof response[Symbol.asyncIterator] === "function") {
+          let next = await response.next();
+          while (!next.done) {
+            respond({
+              done: false,
+              content: next.value,
+              status: "success",
+            });
+            next = await response.next();
+          }
+          respond({
+            done: true,
+            content: next.value,
+            status: "success",
+          });
+        } else {
+          respond({ done: true, content: response, status: "success" });
+        }
+      } catch (e: any) {
+        if (await handleLLMError(e)) {
+          // Respond without an error, so the UI doesn't show the error component
+          respond({ done: true, status: "error" });
+        }
+        let message = e.message;
+        respond({ done: true, error: message, status: "error" });
+
+        const stringified = JSON.stringify({ msg }, null, 2);
+        console.error(`Error handling webview message: ${stringified}\n\n${e}`);
+
+        if (
+          stringified.includes("llm/streamChat") ||
+          stringified.includes("chatDescriber/describe")
+        ) {
+          return;
+        }
+
+        if (e.cause) {
+          if (e.cause.name === "ConnectTimeoutError") {
+            message = `Connection timed out. If you expect it to take a long time to connect, you can increase the timeout in your config by setting "requestOptions": { "timeout": 10000 }. You can find the full config reference here: https://docs.continue.dev/reference/config`;
+          } else if (e.cause.code === "ECONNREFUSED") {
+            message = `Connection was refused. This likely means that there is no server running at the specified URL. If you are running your own server you may need to set the "apiBase" parameter in config.json. For example, you can set up an OpenAI-compatible server like here: https://docs.continue.dev/reference/Model%20Providers/openai#openai-compatible-servers--apis`;
+          } else {
+            message = `The request failed with "${e.cause.name}": ${e.cause.message}. If you're having trouble setting up Continue, please see the troubleshooting guide for help.`;
+          }
+        }
+
+        if (message.includes("https://proxy-server")) {
+          message = message.split("\n").filter((l: string) => l !== "")[1];
+          try {
+            message = JSON.parse(message).message;
+          } catch {}
+          if (message.includes("exceeded")) {
+            message +=
+              " To keep using Continue, you can set up a local model or use your own API key.";
+          }
+
+          vscode.window
+            .showInformationMessage(message, "Add API Key", "Use Local Model")
+            .then((selection) => {
+              if (selection === "Add API Key") {
+                this.request("setupApiKey", undefined);
+              } else if (selection === "Use Local Model") {
+                this.request("setupLocalConfig", undefined);
+              }
+            });
+        } else {
+          Telemetry.capture(
+            "webview_protocol_error",
+            {
+              messageType: msg.messageType,
+              errorMsg: message.split("\n\n")[0],
+              stack: extractMinimalStackTraceInfo(e.stack),
+            },
+            false,
+          );
+        }
+      }
+    }
   }
 }

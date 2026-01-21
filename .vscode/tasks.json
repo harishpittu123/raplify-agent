@@ -24,7 +24,8 @@
         "vscode-extension:continue-ui:build",
         "vscode-extension:esbuild",
         "vscode-extension:esbuild-notify",
-        "gui:dev"
+        "gui:dev",
+        "chrome:dev"
       ],
       "group": {
         "kind": "build",
@@ -145,6 +146,43 @@
         "cwd": "${workspaceFolder}/gui"
       },
       "args": ["run", "dev"],
+      "isBackground": true,
+      "runOptions": {
+        "instanceLimit": 1
+      },
+      "presentation": {
+        "group": "dev-watchers",
+        "panel": "dedicated",
+        "reveal": "always",
+        "focus": false,
+        "showReuseMessage": false
+      },
+      "problemMatcher": [
+        {
+          "pattern": [
+            {
+              "regexp": ".",
+              "file": 1,
+              "location": 2,
+              "message": 3
+            }
+          ],
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": ".",
+            "endsPattern": "."
+          }
+        }
+      ]
+    },
+    {
+      "label": "chrome:dev",
+      "type": "shell",
+      "command": "yarn",
+      "options": {
+        "cwd": "${workspaceFolder}/chrome"
+      },
+      "args": ["dev"],
       "isBackground": true,
       "runOptions": {
         "instanceLimit": 1

@@ -1,5 +1,7 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import posthog from "posthog-js";
+import { MirrorActionKey } from "../../mirror/constants";
+import { sendMirrorAction } from "../../mirror/mirrorBridgeClient";
 import { selectSelectedChatModel } from "../slices/configSlice";
 import {
   cancelToolCall as cancelToolCallAction,
@@ -19,6 +21,10 @@ export const cancelToolCallThunk = createAsyncThunk<
   { toolCallId: string },
   ThunkApiType
 >("chat/cancelToolCall", async ({ toolCallId }, { dispatch, getState }) => {
+  if (sendMirrorAction(MirrorActionKey.CancelToolCall, { toolCallId })) {
+    return;
+  }
+
   const state = getState();
   const selectedChatModel = selectSelectedChatModel(state);
   const continueAfterToolRejection =

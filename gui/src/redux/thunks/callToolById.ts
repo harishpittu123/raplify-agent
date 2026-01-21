@@ -3,6 +3,8 @@ import { ContextItem } from "core";
 import { CLIENT_TOOLS_IMPLS } from "core/tools/builtIn";
 import { ContinueError, ContinueErrorReason } from "core/util/errors";
 import posthog from "posthog-js";
+import { MirrorActionKey } from "../../mirror/constants";
+import { sendMirrorAction } from "../../mirror/mirrorBridgeClient";
 import { callClientTool } from "../../util/clientTools/callClientTool";
 import { selectSelectedChatModel } from "../slices/configSlice";
 import {
@@ -21,6 +23,11 @@ export const callToolById = createAsyncThunk<
   { toolCallId: string; isAutoApproved?: boolean; depth?: number },
   ThunkApiType
 >("chat/callTool", async (inputs, { dispatch, extra, getState }) => {
+  console.log("callToolById thunk called with inputs:", inputs);
+  if (sendMirrorAction(MirrorActionKey.CallToolById, inputs)) {
+    return;
+  }
+
   const { toolCallId, isAutoApproved, depth = 0 } = inputs;
 
   const state = getState();
