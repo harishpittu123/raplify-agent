@@ -1,5 +1,9 @@
 import * as vscode from "vscode";
 
+import {
+  REDUX_MIRROR_WS_PORT,
+  ReduxMirrorBridge,
+} from "./bridge/ReduxMirrorBridge";
 import { getTheme } from "./util/getTheme";
 import { getExtensionVersion, getvsCodeUriScheme } from "./util/util";
 import { getExtensionUri, getNonce, getUniqueId } from "./util/vscode";
@@ -60,8 +64,9 @@ export class ContinueGUIWebviewViewProvider
   constructor(
     private readonly windowId: string,
     private readonly extensionContext: vscode.ExtensionContext,
+    reduxMirrorBridge?: ReduxMirrorBridge,
   ) {
-    this.webviewProtocol = new VsCodeWebviewProtocol();
+    this.webviewProtocol = new VsCodeWebviewProtocol(reduxMirrorBridge);
   }
 
   getSidebarContent(
@@ -103,6 +108,10 @@ export class ContinueGUIWebviewViewProvider
         {
           webviewPort: 65433,
           extensionHostPort: 65433,
+        },
+        {
+          webviewPort: REDUX_MIRROR_WS_PORT,
+          extensionHostPort: REDUX_MIRROR_WS_PORT,
         },
       ],
     };

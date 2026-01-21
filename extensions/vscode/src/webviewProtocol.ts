@@ -7,7 +7,24 @@ import * as vscode from "vscode";
 
 import { IMessenger } from "../../../core/protocol/messenger";
 
+import type { ReduxMirrorPayload } from "core/protocol/ideWebview";
+import {
+  REDUX_MIRROR_EVENT,
+  ReduxMirrorBridge,
+} from "./bridge/ReduxMirrorBridge";
 import { handleLLMError } from "./util/errorHandling";
+
+function parseMirrorState(state: unknown): unknown {
+  if (typeof state === "string") {
+    try {
+      return JSON.parse(state);
+    } catch (error) {
+      console.warn("Failed to parse mirrored Redux state", error);
+      return state;
+    }
+  }
+  return state;
+}
 
 export class VsCodeWebviewProtocol
   implements IMessenger<FromWebviewProtocol, ToWebviewProtocol>
@@ -53,6 +70,22 @@ export class VsCodeWebviewProtocol
     const handleMessage = async (msg: Message): Promise<void> => {
       if (!("messageType" in msg) || !("messageId" in msg)) {
         throw new Error(`Invalid webview protocol msg: ${JSON.stringify(msg)}`);
+      }
+      if (msg.messageType === "mirror/redux-root") {
+        const payload = msg.data as ReduxMirrorPayload | undefined;
+        const parsedState = parseMirrorState(payload?.state);
+        const topLevelKeys =
+          parsedState && typeof parsedState === "object"
+            ? Object.keys(parsedState as Record<string, unknown>)
+            : [];
+        console.log(
+          `[mirror/redux-root] action=${payload?.actionType ?? "unknown"} keys=${topLevelKeys.join(", ")}`,
+          parsedState,
+        );
+        this.mirrorBridge?.broadcast(REDUX_MIRROR_EVENT, {
+          actionType: payload?.actionType ?? "unknown",
+          state: parsedState,
+        });
       }
 
       const respond = (message: any) =>
@@ -152,7 +185,7 @@ export class VsCodeWebviewProtocol
     this._webviewListener = this._webview.onDidReceiveMessage(handleMessage);
   }
 
-  constructor() {}
+  constructor(private mirrorBridge?: ReduxMirrorBridge) {}
 
   invoke<T extends keyof FromWebviewProtocol>(
     messageType: T,

@@ -15,6 +15,11 @@ import {
   ShowFilePayload,
 } from "../";
 
+export interface ReduxMirrorPayload {
+  actionType: string;
+  state: unknown;
+}
+
 export type ToIdeFromWebviewProtocol = ToIdeFromWebviewOrCoreProtocol & {
   openUrl: [string, void];
   applyToFile: [ApplyToFilePayload, void];
@@ -27,6 +32,7 @@ export type ToIdeFromWebviewProtocol = ToIdeFromWebviewOrCoreProtocol & {
   toggleFullScreen: [{ newWindow?: boolean } | undefined, void];
   insertAtCursor: [{ text: string }, void];
   copyText: [{ text: string }, void];
+  "mirror/redux-root": [ReduxMirrorPayload, void];
   "jetbrains/isOSREnabled": [undefined, boolean];
   "jetbrains/onLoad": [
     undefined,

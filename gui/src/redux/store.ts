@@ -15,6 +15,8 @@ import { createFilter } from "redux-persist-transform-filter";
 import autoMergeLevel2 from "redux-persist/lib/stateReconciler/autoMergeLevel2";
 import storage from "redux-persist/lib/storage";
 import { IdeMessenger, IIdeMessenger } from "../context/IdeMessenger";
+import { REDUX_MIRROR_EVENT } from "../mirror/constants";
+import { createReduxMirrorMiddleware } from "./middleware/mirrorRedux";
 import configReducer from "./slices/configSlice";
 import editModeStateReducer from "./slices/editState";
 import indexingReducer from "./slices/indexingSlice";
@@ -23,7 +25,7 @@ import sessionReducer from "./slices/sessionSlice";
 import tabsReducer from "./slices/tabsSlice";
 import uiReducer from "./slices/uiSlice";
 
-const rootReducer = combineReducers({
+const combinedReducer = combineReducers({
   session: sessionReducer,
   ui: uiReducer,
   editModeState: editModeStateReducer,
@@ -32,6 +34,18 @@ const rootReducer = combineReducers({
   tabs: tabsReducer,
   profiles: profilesReducer,
 });
+
+const mirrorableReducer = (
+  state: ReturnType<typeof combinedReducer> | undefined,
+  action: any,
+) => {
+  if (action.type === REDUX_MIRROR_EVENT) {
+    return (action.payload ?? state) as ReturnType<typeof combinedReducer>;
+  }
+  return combinedReducer(state, action);
+};
+
+const rootReducer = mirrorableReducer;
 
 const saveSubsetFilters = [
   createFilter("session", [
@@ -105,6 +119,7 @@ const persistedReducer = persistReducer<ReturnType<typeof rootReducer>>(
 
 export function setupStore(options: { ideMessenger?: IIdeMessenger }) {
   const ideMessenger = options.ideMessenger ?? new IdeMessenger();
+  const reduxMirrorMiddleware = createReduxMirrorMiddleware(ideMessenger);
 
   const logger = createLogger({
     // Customize logger options if needed
@@ -125,7 +140,7 @@ export function setupStore(options: { ideMessenger?: IIdeMessenger }) {
             ideMessenger,
           },
         },
-      }),
+      }).concat(reduxMirrorMiddleware),
     // This can be uncommented to get detailed Redux logs
     // .concat(logger),
   });

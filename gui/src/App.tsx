@@ -4,6 +4,7 @@ import { MainEditorProvider } from "./components/mainInput/TipTapEditor";
 import { SubmenuContextProvidersProvider } from "./context/SubmenuContextProviders";
 import { VscThemeProvider } from "./context/VscTheme";
 import ParallelListeners from "./hooks/ParallelListeners";
+import { useReduxMirrorSync } from "./hooks/useReduxMirrorSync";
 import ConfigPage from "./pages/config";
 import ErrorPage from "./pages/error";
 import Chat from "./pages/gui";
@@ -51,6 +52,8 @@ const router = createMemoryRouter([
   most of which interact with redux etc.
 */
 function App() {
+  useReduxMirrorSync();
+
   return (
     <VscThemeProvider>
       <MainEditorProvider>

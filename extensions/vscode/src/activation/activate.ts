@@ -8,6 +8,7 @@ import { getExtensionVersion, isUnsupportedPlatform } from "../util/util";
 import { GlobalContext } from "core/util/GlobalContext";
 import { VsCodeContinueApi } from "./api";
 import setupInlineTips from "./InlineTipManager";
+import { ReduxMirrorBridge } from "../bridge/ReduxMirrorBridge";
 
 export async function activateExtension(context: vscode.ExtensionContext) {
   const platformCheck = isUnsupportedPlatform();
@@ -42,7 +43,11 @@ export async function activateExtension(context: vscode.ExtensionContext) {
   // Register commands and providers
   setupInlineTips(context);
 
-  const vscodeExtension = new VsCodeExtension(context);
+  const reduxMirrorBridge = new ReduxMirrorBridge();
+  reduxMirrorBridge.start();
+  context.subscriptions.push(reduxMirrorBridge);
+
+  const vscodeExtension = new VsCodeExtension(context, reduxMirrorBridge);
 
   // Load Continue configuration
   if (!context.globalState.get("hasBeenInstalled")) {

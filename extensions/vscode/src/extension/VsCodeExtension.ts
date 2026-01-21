@@ -41,6 +41,7 @@ import { FileSearch } from "../util/FileSearch";
 import { VsCodeIdeUtils } from "../util/ideUtils";
 import { VsCodeIde } from "../VsCodeIde";
 
+import { ReduxMirrorBridge } from "../bridge/ReduxMirrorBridge";
 import { ConfigYamlDocumentLinkProvider } from "./ConfigYamlDocumentLinkProvider";
 import { VsCodeMessenger } from "./VsCodeMessenger";
 
@@ -175,7 +176,10 @@ export class VsCodeExtension {
     }
   }
 
-  constructor(context: vscode.ExtensionContext) {
+  constructor(
+    context: vscode.ExtensionContext,
+    reduxMirrorBridge?: ReduxMirrorBridge,
+  ) {
     // Register auth provider
     this.workOsAuthProvider = new WorkOsAuthProvider(context, this.uriHandler);
 
@@ -260,7 +264,18 @@ export class VsCodeExtension {
     this.sidebar = new ContinueGUIWebviewViewProvider(
       this.windowId,
       this.extensionContext,
+      reduxMirrorBridge,
     );
+
+    reduxMirrorBridge?.onCommand((incomingMessage, respond) => {
+      //   void this.sidebar.webviewProtocol
+      //     .handleExternalMessage(incomingMessage, (response) => {
+      //       respond(response);
+      //     })
+      //     .catch((error) => {
+      //       console.error("Failed to handle mirror command", error);
+      //     });
+    });
 
     // Sidebar
     context.subscriptions.push(
