@@ -2,6 +2,7 @@ import { CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { ApplyState } from "core";
 import { useContext } from "react";
 import { IdeMessengerContext } from "../context/IdeMessenger";
+import { sendMirrorVsCodeMessage } from "../mirror/mirrorBridgeClient";
 import { useAppDispatch } from "../redux/hooks";
 import { cancelToolCall } from "../redux/slices/sessionSlice";
 import { getMetaKeyLabel } from "../util";
@@ -39,10 +40,16 @@ export default function AcceptRejectAllButtons({
 
     // Process all pending apply states
     for (const { filepath = "", streamId } of pendingApplyStates) {
-      ideMessenger.post(status, {
+      const payload = {
         filepath,
         streamId,
-      });
+      };
+
+      if (sendMirrorVsCodeMessage(status, payload)) {
+        continue;
+      }
+
+      ideMessenger.post(status, payload);
     }
 
     if (onAcceptOrReject) {

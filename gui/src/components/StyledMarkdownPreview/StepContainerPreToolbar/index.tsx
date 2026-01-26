@@ -9,6 +9,7 @@ import { useContext, useEffect, useMemo, useState } from "react";
 import { IdeMessengerContext } from "../../../context/IdeMessenger";
 import { useIdeMessengerRequest } from "../../../hooks/useIdeMessengerRequest";
 import { useWebviewListener } from "../../../hooks/useWebviewListener";
+import { sendMirrorVsCodeMessage } from "../../../mirror/mirrorBridgeClient";
 import { getStatusIcon } from "../../../pages/gui/ToolCallDiv/utils";
 import { useAppSelector } from "../../../redux/hooks";
 import { selectToolCallById } from "../../../redux/selectors/selectToolCalls";
@@ -250,6 +251,7 @@ export function StepContainerPreToolbar({
   async function handleDiffAction(action: "accept" | "reject") {
     const filepath = await getFileUriToApplyTo();
     if (!filepath) {
+      console.log("####Could not resolve filepath for diff action");
       void ideMessenger.ide.showToast(
         "error",
         `Could not resolve filepath to ${action} changes`,
@@ -257,10 +259,19 @@ export function StepContainerPreToolbar({
       return;
     }
 
-    ideMessenger.post(`${action}Diff`, {
+    const messageType: any = `${action}Diff`;
+    const messagePayload = {
       filepath,
       streamId: codeBlockStreamId,
-    });
+    };
+
+    if (sendMirrorVsCodeMessage(messageType, messagePayload)) {
+      console.log("####sent mirror vscode message for diff action");
+      setAppliedFileUri(undefined);
+      return;
+    }
+
+    ideMessenger.post(messageType, messagePayload);
 
     setAppliedFileUri(undefined);
   }

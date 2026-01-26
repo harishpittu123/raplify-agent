@@ -10,6 +10,7 @@ export const REDUX_MIRROR_WS_PATH = "/mirror";
 export const REDUX_MIRROR_COMMAND_EVENT = "mirror/command";
 export const REDUX_MIRROR_COMMAND_RESPONSE_EVENT = "mirror/command/response";
 export const REDUX_MIRROR_ACTION_EVENT = "mirror/action";
+export const REDUX_MIRROR_VSCODE_EVENT = "mirror/vscode";
 
 interface MirrorMessage {
   type: string;
@@ -22,9 +23,15 @@ type MirrorCommandHandler = (
 ) => void;
 
 type MirrorActionHandler = (message: MirrorActionMessage) => void;
+type MirrorVsCodeHandler = (message: MirrorVsCodeMessage) => void;
 
 export interface MirrorActionMessage {
   key: string;
+  payload: unknown;
+}
+
+export interface MirrorVsCodeMessage {
+  action: string;
   payload: unknown;
 }
 
@@ -33,6 +40,7 @@ export class ReduxMirrorBridge implements vscode.Disposable {
   private readonly clients = new Set<WebSocket>();
   private commandHandler?: MirrorCommandHandler;
   private actionHandler?: MirrorActionHandler;
+  private vsCodeHandler?: MirrorVsCodeHandler;
 
   constructor(
     private readonly options: {
@@ -80,6 +88,14 @@ export class ReduxMirrorBridge implements vscode.Disposable {
               return;
             }
             this.actionHandler(parsed.payload as MirrorActionMessage);
+          } else if (parsed?.type === REDUX_MIRROR_VSCODE_EVENT) {
+            if (!this.vsCodeHandler) {
+              console.warn(
+                "ReduxMirrorBridge received vscode message with no handler",
+              );
+              return;
+            }
+            this.vsCodeHandler(parsed.payload as MirrorVsCodeMessage);
           }
         } catch (error) {
           console.warn("ReduxMirrorBridge message handling error", error);
@@ -139,5 +155,9 @@ export class ReduxMirrorBridge implements vscode.Disposable {
 
   public onAction(handler: MirrorActionHandler): void {
     this.actionHandler = handler;
+  }
+
+  public onVsCodeMessage(handler: MirrorVsCodeHandler): void {
+    this.vsCodeHandler = handler;
   }
 }

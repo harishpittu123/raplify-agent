@@ -11,6 +11,7 @@ import {
   REDUX_MIRROR_COMMAND_RESPONSE_EVENT,
   REDUX_MIRROR_EVENT,
   REDUX_MIRROR_QUERY_PARAM,
+  REDUX_MIRROR_VSCODE_EVENT,
   REDUX_MIRROR_WS_PATH,
   REDUX_MIRROR_WS_PORT,
 } from "./constants";
@@ -62,6 +63,7 @@ const flushPendingMessages = (): void => {
 
 const enqueueMirrorMessage = (message: OutboundMirrorMessage): void => {
   const serialized = JSON.stringify(message);
+  console.log("Enqueueing mirror message", serialized);
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(serialized);
     return;
@@ -190,6 +192,25 @@ export function sendMirrorAction<T extends MirrorActionKey>(
   enqueueMirrorMessage({
     type: REDUX_MIRROR_ACTION_EVENT,
     payload: message,
+  });
+
+  return true;
+}
+
+export function sendMirrorVsCodeMessage(
+  action: string,
+  payload: unknown,
+): boolean {
+  if (!mirrorActive) {
+    return false;
+  }
+
+  enqueueMirrorMessage({
+    type: REDUX_MIRROR_VSCODE_EVENT,
+    payload: {
+      action,
+      payload,
+    },
   });
 
   return true;

@@ -6,6 +6,7 @@ import { ConfigHandler } from "core/config/ConfigHandler";
 import { EXTENSION_NAME, getControlPlaneEnv } from "core/control-plane/env";
 import { Core } from "core/core";
 import { FromCoreProtocol, ToCoreProtocol } from "core/protocol";
+import type { Message } from "core/protocol/messenger";
 import { InProcessMessenger } from "core/protocol/messenger";
 import {
   getConfigJsonPath,
@@ -43,6 +44,7 @@ import { VsCodeIde } from "../VsCodeIde";
 
 import {
   MirrorActionMessage,
+  MirrorVsCodeMessage,
   ReduxMirrorBridge,
 } from "../bridge/ReduxMirrorBridge";
 import { ConfigYamlDocumentLinkProvider } from "./ConfigYamlDocumentLinkProvider";
@@ -284,6 +286,22 @@ export class VsCodeExtension {
       reduxMirrorBridge.onAction((action: MirrorActionMessage) => {
         this.sidebar.webviewProtocol.send(action.key, action.payload);
       });
+
+      reduxMirrorBridge.onVsCodeMessage(
+        (mirrorMessage: MirrorVsCodeMessage) => {
+          const message: Message = {
+            messageId: uuidv4(),
+            messageType: mirrorMessage.action,
+            data: mirrorMessage.payload,
+          };
+
+          void this.sidebar.webviewProtocol
+            .handleExternalMessage(message)
+            .catch((error) => {
+              console.error("Failed to handle mirror vscode message", error);
+            });
+        },
+      );
     }
     // Sidebar
     context.subscriptions.push(

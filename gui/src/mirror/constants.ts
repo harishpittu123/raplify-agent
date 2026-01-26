@@ -8,6 +8,7 @@ export const REDUX_MIRROR_WS_PATH = "/mirror";
 export const REDUX_MIRROR_COMMAND_EVENT = "mirror/command";
 export const REDUX_MIRROR_COMMAND_RESPONSE_EVENT = "mirror/command/response";
 export const REDUX_MIRROR_ACTION_EVENT = "mirror/action";
+export const REDUX_MIRROR_VSCODE_EVENT = "mirror/vscode";
 
 export const REDUX_MIRROR_ALLOWED_COMMANDS = new Set([
   "acceptDiff",
