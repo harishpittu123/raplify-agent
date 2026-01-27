@@ -1,4 +1,5 @@
 import { createServer } from "net";
+import * as path from "path";
 import * as vscode from "vscode";
 import { WebSocket, WebSocketServer } from "ws";
 
@@ -118,8 +119,21 @@ export class ReduxMirrorBridge implements vscode.Disposable {
 
           // Handle file content request from Chrome
           if (parsed?.type === "GET_FILE_CONTENT") {
+            console.log(
+              "[Bridge] Received GET_FILE_CONTENT message:",
+              JSON.stringify(parsed, null, 2),
+            );
+
+            // Extract filePath from single-level payload
             const filePath = (parsed.payload as any)?.filePath;
+
+            console.log("[Bridge] Extracted filePath:", filePath);
+
             if (!filePath) {
+              console.error(
+                "[Bridge] No file path provided in message. Full payload:",
+                JSON.stringify(parsed, null, 2),
+              );
               if (socket.readyState === WebSocket.OPEN) {
                 socket.send(
                   JSON.stringify({
@@ -288,6 +302,7 @@ export class ReduxMirrorBridge implements vscode.Disposable {
       files.push({
         name: folder.name,
         path: folder.uri.fsPath,
+        fullPath: folder.uri.fsPath,
         type: "folder",
         children: folderItems,
       });
@@ -321,6 +336,7 @@ export class ReduxMirrorBridge implements vscode.Disposable {
       for (const [name, fileType] of entries) {
         const filePath = basePath ? `${basePath}/${name}` : name;
         const fullUri = vscode.Uri.joinPath(uri, name);
+        const fullPath = fullUri.fsPath;
 
         // Skip hidden files and common excludes
         if (name.startsWith(".") || name === "node_modules") {
@@ -332,6 +348,7 @@ export class ReduxMirrorBridge implements vscode.Disposable {
           items.push({
             name,
             path: filePath,
+            fullPath: fullPath,
             type: "folder",
             children,
           });
@@ -339,6 +356,7 @@ export class ReduxMirrorBridge implements vscode.Disposable {
           items.push({
             name,
             path: filePath,
+            fullPath: fullPath,
             type: "file",
           });
         }
@@ -353,28 +371,51 @@ export class ReduxMirrorBridge implements vscode.Disposable {
 
   /**
    * Reads the content of a file from the workspace
-   * @param filePath The relative path of the file
+   * @param filePath The full or relative path of the file
    * @returns The file content as a string
    */
   private async getFileContent(filePath: string): Promise<string> {
+    console.log("[Bridge] getFileContent called with filePath:", filePath);
+
+    // If filePath is already absolute, use it directly
+    if (path.isAbsolute(filePath)) {
+      console.log("[Bridge] Using absolute file path:", filePath);
+      try {
+        const fileUri = vscode.Uri.file(filePath);
+        const fileData = await vscode.workspace.fs.readFile(fileUri);
+        return new TextDecoder().decode(fileData);
+      } catch (error) {
+        console.error(
+          `Error reading file with absolute path ${filePath}:`,
+          error,
+        );
+        throw new Error(`File not found: ${filePath}`);
+      }
+    }
+
+    // Otherwise, treat as relative path and look in workspace
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
       throw new Error("No workspace folders found");
     }
 
-    // Try to find the file in workspace folders
-    for (const folder of workspaceFolders) {
-      const fileUri = vscode.Uri.joinPath(folder.uri, filePath);
-      try {
-        const fileData = await vscode.workspace.fs.readFile(fileUri);
-        return new TextDecoder().decode(fileData);
-      } catch {
-        // Continue to next folder if file not found
-        continue;
-      }
+    const workspaceFolder = workspaceFolders[0];
+
+    // Normalize the file path - remove leading slashes
+    let normalizedPath = filePath;
+    if (normalizedPath.startsWith("/")) {
+      normalizedPath = normalizedPath.substring(1);
     }
 
-    throw new Error(`File not found: ${filePath}`);
+    const fileUri = vscode.Uri.joinPath(workspaceFolder.uri, normalizedPath);
+
+    try {
+      const fileData = await vscode.workspace.fs.readFile(fileUri);
+      return new TextDecoder().decode(fileData);
+    } catch (error) {
+      console.error(`Error reading file ${filePath}:`, error);
+      throw new Error(`File not found: ${filePath}`);
+    }
   }
 
   public broadcast(type: string, payload: unknown): void {

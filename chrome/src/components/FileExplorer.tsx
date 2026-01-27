@@ -11,14 +11,23 @@ const DEPTH_INDENT = 10;
 const FONT_SIZE = 14;
 const ICON_SIZE = 20;
 
-interface FileItem {
+export interface FileItem {
   name: string;
   path: string;
+  fullPath?: string;
   type: "file" | "folder";
   children?: FileItem[];
 }
 
-export function FileExplorer() {
+export function FileExplorer({
+  onFileOpen,
+}: {
+  onFileOpen?: (file: {
+    filePath: string;
+    fileName: string;
+    content: string;
+  }) => void;
+}) {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
@@ -29,7 +38,7 @@ export function FileExplorer() {
   const [fileLoading, setFileLoading] = useState(false);
   const { sendMessage } = useWebSocketSend();
   const { connected } = useWebSocketStatus();
-
+  console.log("[FileExplorer] files status:", files);
   const loadWorkspaceFiles = useCallback(() => {
     setLoading(true);
     sendMessage("WORKSPACE_FILES", {
@@ -72,6 +81,13 @@ export function FileExplorer() {
     console.log("[FileExplorer] Received GET_FILE_CONTENT response:", payload);
     if (payload && payload.success) {
       setFileContent(payload.content || "");
+      if (onFileOpen && selectedFile) {
+        onFileOpen({
+          filePath: selectedFile,
+          fileName: selectedFile.split("/").pop() || "File",
+          content: payload.content || "",
+        });
+      }
     } else {
       console.error("Error loading file content:", payload?.error);
       setFileContent(null);
@@ -147,14 +163,24 @@ export function FileExplorer() {
               if (isFolder) {
                 toggleFolder(item.path);
               } else {
+                console.log(
+                  "[FileExplorer] File clicked:",
+                  item.name,
+                  "Full path:",
+                  item.fullPath,
+                  "Relative path:",
+                  item.path,
+                );
                 setSelectedFile(item.path);
                 setFileLoading(true);
-                sendMessage("GET_FILE_CONTENT", {
-                  action: "GET_FILE_CONTENT",
-                  payload: {
-                    filePath: item.path,
-                  },
-                });
+                const message = {
+                  filePath: item.fullPath || item.path,
+                };
+                console.log(
+                  "[FileExplorer] Sending GET_FILE_CONTENT message:",
+                  JSON.stringify(message),
+                );
+                sendMessage("GET_FILE_CONTENT", message);
               }
             }}
           >
@@ -242,7 +268,7 @@ export function FileExplorer() {
       );
     });
   };
-
+  console.log("[FileExplorer] Rendering with files:", fileContent);
   return (
     <div className="panel">
       <div
@@ -283,31 +309,7 @@ export function FileExplorer() {
         )}
         {renderFileTree(files)}
       </div>
-      {selectedFile && (
-        <div className="panel" style={{ marginTop: "16px", flex: 1 }}>
-          <div className="panel-header" style={{ fontSize: FONT_SIZE - 1 }}>
-            {selectedFile.split("/").pop() || "File"}
-          </div>
-          <div
-            className="panel-content"
-            style={{
-              fontFamily:
-                "Monaco, 'Courier New', monospace, -apple-system, BlinkMacSystemFont, 'Segoe UI'",
-              fontSize: FONT_SIZE,
-              overflow: "auto",
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-            }}
-          >
-            {fileLoading && (
-              <div style={{ color: "var(--text-secondary)" }}>
-                Loading file content...
-              </div>
-            )}
-            {!fileLoading && fileContent !== null && fileContent}
-          </div>
-        </div>
-      )}
+      {/* File content display removed. File content will be shown in the editor panel only. */}
     </div>
   );
 }

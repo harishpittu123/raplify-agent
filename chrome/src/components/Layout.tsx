@@ -7,6 +7,11 @@ import { Toolbar } from "./Toolbar";
 export function Layout() {
   const [leftPanelWidth, setLeftPanelWidth] = useState(250);
   const [rightPanelWidth, setRightPanelWidth] = useState(500);
+  const [openedFile, setOpenedFile] = useState<{
+    filePath: string;
+    fileName: string;
+    content: string;
+  } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isResizingLeftRef = useRef(false);
   const isResizingRightRef = useRef(false);
@@ -87,7 +92,7 @@ export function Layout() {
       >
         {/* Left Panel */}
         <div style={{ width: `${leftPanelWidth}px`, overflow: "hidden" }}>
-          <FileExplorer />
+          <FileExplorer onFileOpen={setOpenedFile} />
         </div>
 
         {/* Left Resizer */}
@@ -106,7 +111,11 @@ export function Layout() {
             overflow: "hidden",
           }}
         >
-          <Editor />
+          <Editor
+            filePath={openedFile?.filePath || ""}
+            fileName={openedFile?.fileName || ""}
+            content={openedFile?.content || ""}
+          />
         </div>
 
         {/* Right Resizer */}
