@@ -116,6 +116,55 @@ export class ReduxMirrorBridge implements vscode.Disposable {
             return;
           }
 
+          // Handle file content request from Chrome
+          if (parsed?.type === "GET_FILE_CONTENT") {
+            const filePath = (parsed.payload as any)?.filePath;
+            if (!filePath) {
+              if (socket.readyState === WebSocket.OPEN) {
+                socket.send(
+                  JSON.stringify({
+                    type: "GET_FILE_CONTENT",
+                    payload: {
+                      success: false,
+                      error: "No file path provided",
+                    },
+                  }),
+                );
+              }
+              return;
+            }
+
+            try {
+              const fileContent = await this.getFileContent(filePath);
+              if (socket.readyState === WebSocket.OPEN) {
+                socket.send(
+                  JSON.stringify({
+                    type: "GET_FILE_CONTENT",
+                    payload: {
+                      success: true,
+                      content: fileContent,
+                      filePath: filePath,
+                    },
+                  }),
+                );
+              }
+            } catch (error) {
+              console.error(`Error reading file ${filePath}:`, error);
+              if (socket.readyState === WebSocket.OPEN) {
+                socket.send(
+                  JSON.stringify({
+                    type: "GET_FILE_CONTENT",
+                    payload: {
+                      success: false,
+                      error: `Failed to read file: ${(error as Error).message}`,
+                    },
+                  }),
+                );
+              }
+            }
+            return;
+          }
+
           if (parsed?.type === REDUX_MIRROR_COMMAND_EVENT) {
             if (!this.commandHandler) {
               console.warn(
@@ -300,6 +349,32 @@ export class ReduxMirrorBridge implements vscode.Disposable {
       console.error(`Error reading directory ${uri}:`, error);
       return [];
     }
+  }
+
+  /**
+   * Reads the content of a file from the workspace
+   * @param filePath The relative path of the file
+   * @returns The file content as a string
+   */
+  private async getFileContent(filePath: string): Promise<string> {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+      throw new Error("No workspace folders found");
+    }
+
+    // Try to find the file in workspace folders
+    for (const folder of workspaceFolders) {
+      const fileUri = vscode.Uri.joinPath(folder.uri, filePath);
+      try {
+        const fileData = await vscode.workspace.fs.readFile(fileUri);
+        return new TextDecoder().decode(fileData);
+      } catch {
+        // Continue to next folder if file not found
+        continue;
+      }
+    }
+
+    throw new Error(`File not found: ${filePath}`);
   }
 
   public broadcast(type: string, payload: unknown): void {

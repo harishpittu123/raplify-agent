@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useWebSocketContext } from "../context/WebSocketContext";
 import { webSocketMessageService } from "../utils/webSocketMessageService";
 
@@ -53,11 +53,14 @@ export function useWebSocketSend() {
     [sendMessage],
   );
 
-  return {
-    sendMessage: send,
-    connected,
-    socket,
-  };
+  return useMemo(
+    () => ({
+      sendMessage: send,
+      connected,
+      socket,
+    }),
+    [send, connected, socket],
+  );
 }
 
 /**
@@ -70,9 +73,12 @@ export function useWebSocketStatus() {
   const { connected, connectionState, refreshConnection } =
     useWebSocketContext();
 
-  return {
-    connected,
-    connectionState,
-    refreshConnection,
-  };
+  return useMemo(
+    () => ({
+      connected,
+      connectionState,
+      refreshConnection,
+    }),
+    [connected, connectionState, refreshConnection],
+  );
 }

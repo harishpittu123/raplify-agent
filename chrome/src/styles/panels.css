@@ -22,9 +22,96 @@
 .panel-content {
   flex: 1;
   overflow: auto;
-  padding: 8px 0;
+  padding: 0;
+  font-family:
+    Roboto,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
 }
 
+/* Roboto font import */
+@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap");
+
+/* Seti icon font */
+@font-face {
+  font-family: "seti";
+  src: url("../resources/seti.woff") format("woff");
+}
+
+/* Codicon icon font */
+@font-face {
+  font-family: "codicon";
+  src: url("https://cdn.jsdelivr.net/npm/vscode-codicons@0.0.35/dist/codicon.ttf")
+    format("truetype");
+}
+
+/* File Explorer Tree Items */
+.file-tree-item {
+  padding: 0 2px 0 2px;
+  font-size: 13px;
+  font-family:
+    Roboto,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  color: var(--text-primary);
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color 0.05s,
+    color 0.05s;
+  border-left: 2px solid transparent;
+}
+
+.file-tree-item:hover {
+  background: var(--bg-secondary);
+}
+
+.file-tree-item.is-selected {
+  background: var(--bg-tertiary);
+  border-left-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.file-tree-item.is-file {
+  color: var(--text-primary);
+  font-weight: 400;
+}
+
+.file-tree-item.is-folder {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* Seti icon styling - Use Seti font */
+.seti-icon {
+  font-family: "seti" !important;
+  font-style: normal;
+  font-weight: normal !important;
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+/* Codicon icon styling */
+.codicon-chevron {
+  font-family: "codicon" !important;
+  font-style: normal;
+  font-weight: normal !important;
+  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Legacy file-item class for backward compatibility */
 .file-item {
   padding: 4px 16px;
   font-size: 13px;
@@ -32,6 +119,12 @@
   cursor: pointer;
   user-select: none;
   transition: background-color 0.2s;
+  font-family:
+    Roboto,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
 }
 
 .file-item:hover {

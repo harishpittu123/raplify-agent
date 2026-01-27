@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Layout } from "./components/Layout";
 import { WebSocketProvider } from "./context/WebSocketContext";
 import { useWebSocket } from "./hooks/useWebSocket";
@@ -11,8 +12,20 @@ function AppContent() {
 function App() {
   const webSocketState = useWebSocket();
 
+  // Memoize the context value to prevent unnecessary re-renders
+  const memoizedValue = useMemo(
+    () => webSocketState,
+    [
+      webSocketState.connected,
+      webSocketState.socket,
+      webSocketState.connectionState,
+      webSocketState.sendMessage,
+      webSocketState.refreshConnection,
+    ],
+  );
+
   return (
-    <WebSocketProvider value={webSocketState}>
+    <WebSocketProvider value={memoizedValue}>
       <AppContent />
     </WebSocketProvider>
   );

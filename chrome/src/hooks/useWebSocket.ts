@@ -135,6 +135,7 @@ export function useWebSocket() {
       const ws = await tryConnectToPort(port, projectPath);
 
       if (ws) {
+        console.log(`[useWebSocket] Connection successful at port ${port}`);
         setConnected(true);
         setSocket(ws);
         (window as any).__fileExplorerWs = ws;
@@ -154,7 +155,7 @@ export function useWebSocket() {
         });
 
         ws.addEventListener("close", () => {
-          console.log("WebSocket disconnected");
+          console.log("[useWebSocket] WebSocket disconnected");
           setConnected(false);
           setSocket(null);
           // Schedule reconnection attempt
