@@ -38,6 +38,7 @@ import {
   WorkOsAuthProvider,
 } from "../stubs/WorkOsAuthProvider";
 import { Battery } from "../util/battery";
+import { FileExplorerManager } from "../util/FileExplorerManager";
 import { FileSearch } from "../util/FileSearch";
 import { VsCodeIdeUtils } from "../util/ideUtils";
 import { VsCodeIde } from "../VsCodeIde";
@@ -289,6 +290,20 @@ export class VsCodeExtension {
 
       reduxMirrorBridge.onVsCodeMessage(
         (mirrorMessage: MirrorVsCodeMessage) => {
+          // Handle file explorer requests
+          if (mirrorMessage.action === "getWorkspaceFiles") {
+            void this.handleGetWorkspaceFiles(reduxMirrorBridge);
+            return;
+          }
+
+          if (mirrorMessage.action === "getFileContent") {
+            void this.handleGetFileContent(
+              reduxMirrorBridge,
+              mirrorMessage.payload as { path: string },
+            );
+            return;
+          }
+
           const message: Message = {
             messageId: uuidv4(),
             messageType: mirrorMessage.action,
@@ -710,6 +725,43 @@ export class VsCodeExtension {
         }
       }
     });
+  }
+
+  private async handleGetWorkspaceFiles(reduxMirrorBridge: ReduxMirrorBridge) {
+    try {
+      const files = await FileExplorerManager.getWorkspaceFileHierarchy();
+      reduxMirrorBridge.broadcast("workspaceFilesResponse", {
+        success: true,
+        files,
+      });
+    } catch (error) {
+      console.error("Error getting workspace files:", error);
+      reduxMirrorBridge.broadcast("workspaceFilesResponse", {
+        success: false,
+        error: (error as Error).message,
+      });
+    }
+  }
+
+  private async handleGetFileContent(
+    reduxMirrorBridge: ReduxMirrorBridge,
+    payload: { path: string },
+  ) {
+    try {
+      const content = await FileExplorerManager.getFileContent(payload.path);
+      reduxMirrorBridge.broadcast("fileContentResponse", {
+        success: true,
+        path: payload.path,
+        content,
+      });
+    } catch (error) {
+      console.error("Error getting file content:", error);
+      reduxMirrorBridge.broadcast("fileContentResponse", {
+        success: false,
+        path: payload.path,
+        error: (error as Error).message,
+      });
+    }
   }
 
   static continueVirtualDocumentScheme = EXTENSION_NAME;

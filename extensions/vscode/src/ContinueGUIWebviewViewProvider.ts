@@ -64,7 +64,7 @@ export class ContinueGUIWebviewViewProvider
   constructor(
     private readonly windowId: string,
     private readonly extensionContext: vscode.ExtensionContext,
-    reduxMirrorBridge?: ReduxMirrorBridge,
+    private readonly reduxMirrorBridge?: ReduxMirrorBridge,
   ) {
     this.webviewProtocol = new VsCodeWebviewProtocol(reduxMirrorBridge);
   }
@@ -109,10 +109,19 @@ export class ContinueGUIWebviewViewProvider
           webviewPort: 65433,
           extensionHostPort: 65433,
         },
-        {
-          webviewPort: REDUX_MIRROR_WS_PORT,
-          extensionHostPort: REDUX_MIRROR_WS_PORT,
-        },
+        ...(this.reduxMirrorBridge?.getActualPort()
+          ? [
+              {
+                webviewPort: this.reduxMirrorBridge.getActualPort()!,
+                extensionHostPort: this.reduxMirrorBridge.getActualPort()!,
+              },
+            ]
+          : [
+              {
+                webviewPort: REDUX_MIRROR_WS_PORT,
+                extensionHostPort: REDUX_MIRROR_WS_PORT,
+              },
+            ]),
       ],
     };
 
@@ -178,6 +187,7 @@ export class ContinueGUIWebviewViewProvider
           ) || [],
         )}</script>
         <script>window.isFullScreen = ${isFullScreen}</script>
+        <script>window.wsPort = ${this.reduxMirrorBridge?.getActualPort() ?? REDUX_MIRROR_WS_PORT}</script>
 
         ${
           edits

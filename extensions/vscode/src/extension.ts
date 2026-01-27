@@ -57,4 +57,11 @@ export function deactivate() {
 
   Telemetry.shutdownPosthogClient();
   SentryLogger.shutdownSentryClient();
+
+  // Note: VS Code automatically disposes all subscriptions in context.subscriptions,
+  // which includes the ReduxMirrorBridge instance, ensuring the WebSocket server
+  // is closed and the port is freed when the extension is deactivated.
+  console.log(
+    "Extension deactivated - WebSocket server and port have been freed",
+  );
 }

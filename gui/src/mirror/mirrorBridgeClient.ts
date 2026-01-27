@@ -14,6 +14,7 @@ import {
   REDUX_MIRROR_VSCODE_EVENT,
   REDUX_MIRROR_WS_PATH,
   REDUX_MIRROR_WS_PORT,
+  REDUX_MIRROR_WS_PORT_QUERY_PARAM,
 } from "./constants";
 
 declare global {
@@ -46,7 +47,13 @@ type OutboundMirrorMessage = {
 const buildSocketUrl = (): string => {
   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
   const host = window.location.hostname || "localhost";
-  return `${protocol}://${host}:${REDUX_MIRROR_WS_PORT}${REDUX_MIRROR_WS_PATH}`;
+
+  // Get port from URL parameters, fallback to constant
+  const params = new URLSearchParams(window.location.search);
+  const portFromUrl = params.get(REDUX_MIRROR_WS_PORT_QUERY_PARAM);
+  const port = portFromUrl ? parseInt(portFromUrl, 10) : REDUX_MIRROR_WS_PORT;
+
+  return `${protocol}://${host}:${port}${REDUX_MIRROR_WS_PATH}`;
 };
 
 const flushPendingMessages = (): void => {

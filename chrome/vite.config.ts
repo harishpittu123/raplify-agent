@@ -1,14 +1,13 @@
+import react from "@vitejs/plugin-react";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 import { defineConfig } from "vite";
-import { viteStaticCopy } from "vite-plugin-static-copy";
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   root: rootDir,
-  appType: "mpa",
-  publicDir: false,
+  plugins: [react()],
   server: {
     host: "127.0.0.1",
     port: 5175,
@@ -22,17 +21,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         index: resolve(rootDir, "index.html"),
+        gui: resolve(rootDir, "gui.html"),
       },
     },
   },
-  plugins: [
-    viteStaticCopy({
-      targets: [
-        {
-          src: "gui",
-          dest: ".",
-        },
-      ],
-    }),
-  ],
 });
