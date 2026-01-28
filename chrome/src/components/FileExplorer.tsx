@@ -268,7 +268,6 @@ export function FileExplorer({
       );
     });
   };
-  console.log("[FileExplorer] Rendering with files:", fileContent);
   return (
     <div className="panel">
       <div

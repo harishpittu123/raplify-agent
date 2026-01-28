@@ -54,7 +54,6 @@ import { VsCodeMessenger } from "./VsCodeMessenger";
 import { modelSupportsNextEdit } from "core/llm/autodetect";
 import { NEXT_EDIT_MODELS } from "core/llm/constants";
 import { NextEditProvider } from "core/nextEdit/NextEditProvider";
-import { isNextEditTest } from "core/nextEdit/utils";
 import { JumpManager } from "../activation/JumpManager";
 import setupNextEditWindowManager, {
   NextEditWindowManager,
@@ -116,22 +115,22 @@ export class VsCodeExtension {
       );
 
     // Use smart defaults.
-    let nextEditEnabled = vscodeConfig.get<boolean>("enableNextEdit");
-    if (nextEditEnabled === undefined) {
-      // First time - set smart default.
-      nextEditEnabled = modelSupportsNext ?? false;
-      await vscodeConfig.update(
-        "enableNextEdit",
-        nextEditEnabled,
-        vscode.ConfigurationTarget.Global,
-      );
-    }
+    // let nextEditEnabled = vscodeConfig.get<boolean>("enableNextEdit");
+    // if (nextEditEnabled === undefined) {
+    //   // First time - set smart default.
+    //   nextEditEnabled = modelSupportsNext ?? false;
+    //   await vscodeConfig.update(
+    //     "enableNextEdit",
+    //     nextEditEnabled,
+    //     vscode.ConfigurationTarget.Global,
+    //   );
+    // }
 
     // Check if Next Edit is enabled but model doesn't support it.
     if (
-      nextEditEnabled &&
+      // nextEditEnabled &&
       !modelSupportsNext &&
-      !isNextEditTest() &&
+      // !isNextEditTest() &&
       process.env.CONTINUE_E2E_NON_NEXT_EDIT_TEST === "true"
     ) {
       vscode.window
@@ -155,8 +154,8 @@ export class VsCodeExtension {
         });
     }
 
-    const shouldEnableNextEdit =
-      (modelSupportsNext && nextEditEnabled) || isNextEditTest();
+    const shouldEnableNextEdit = modelSupportsNext;
+    // (modelSupportsNext && nextEditEnabled) || isNextEditTest();
 
     if (shouldEnableNextEdit) {
       await setupNextEditWindowManager(context);

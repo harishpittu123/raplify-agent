@@ -62,13 +62,13 @@ export class ReduxMirrorBridge implements vscode.Disposable {
       return;
     }
 
-    const path = this.options.path ?? REDUX_MIRROR_WS_PATH;
+    const wsPath = this.options.path ?? REDUX_MIRROR_WS_PATH;
     const port = await this.findAvailablePort(
       this.options.port ?? INITIAL_WS_PORT,
     );
 
     this.actualPort = port;
-    this.server = new WebSocketServer({ port, path });
+    this.server = new WebSocketServer({ port, path: wsPath });
 
     this.server.on("connection", (socket) => {
       this.clients.add(socket);
@@ -179,6 +179,82 @@ export class ReduxMirrorBridge implements vscode.Disposable {
             return;
           }
 
+          // Handle save file content request from Chrome
+          if (parsed?.type === "SAVE_FILE_CONTENT") {
+            const filePath = (parsed.payload as any)?.filePath;
+            const content = (parsed.payload as any)?.content;
+            if (!filePath || typeof content !== "string") {
+              if (socket.readyState === WebSocket.OPEN) {
+                socket.send(
+                  JSON.stringify({
+                    type: "SAVE_FILE_CONTENT",
+                    payload: {
+                      success: false,
+                      error: "Missing filePath or content",
+                    },
+                  }),
+                );
+              }
+              return;
+            }
+            try {
+              if (
+                !vscode ||
+                !vscode.Uri ||
+                !vscode.workspace ||
+                !vscode.workspace.fs
+              ) {
+                if (socket.readyState === WebSocket.OPEN) {
+                  socket.send(
+                    JSON.stringify({
+                      type: "SAVE_FILE_CONTENT",
+                      payload: {
+                        success: false,
+                        error:
+                          "VS Code API is not available. This extension must be run inside VS Code.",
+                      },
+                    }),
+                  );
+                }
+                return;
+              }
+              const fileUri = path.isAbsolute(filePath)
+                ? vscode.Uri.file(filePath)
+                : vscode.Uri.joinPath(
+                    vscode.workspace.workspaceFolders?.[0]?.uri!,
+                    filePath,
+                  );
+              await vscode.workspace.fs.writeFile(
+                fileUri,
+                Buffer.from(content, "utf8"),
+              );
+              if (socket.readyState === WebSocket.OPEN) {
+                socket.send(
+                  JSON.stringify({
+                    type: "SAVE_FILE_CONTENT",
+                    payload: {
+                      success: true,
+                      filePath,
+                    },
+                  }),
+                );
+              }
+            } catch (error) {
+              if (socket.readyState === WebSocket.OPEN) {
+                socket.send(
+                  JSON.stringify({
+                    type: "SAVE_FILE_CONTENT",
+                    payload: {
+                      success: false,
+                      error: (error as Error).message,
+                    },
+                  }),
+                );
+              }
+            }
+            return;
+          }
+
           if (parsed?.type === REDUX_MIRROR_COMMAND_EVENT) {
             if (!this.commandHandler) {
               console.warn(
@@ -226,7 +302,7 @@ export class ReduxMirrorBridge implements vscode.Disposable {
 
     this.server.on("listening", () => {
       console.log(
-        `ReduxMirrorBridge listening on ws://localhost:${port}${path ?? ""}`,
+        `ReduxMirrorBridge listening on ws://localhost:${port}${wsPath ?? ""}`,
       );
     });
 

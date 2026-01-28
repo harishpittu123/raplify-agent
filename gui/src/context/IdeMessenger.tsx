@@ -16,6 +16,27 @@ import {
 import { createContext } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { isJetBrains } from "../util";
+// Mirror WebSocket support
+let mirrorSocket: WebSocket | null = null;
+let isMirror = false;
+
+// Detect if running in mirror mode (e.g., ?mirror in URL)
+if (
+  typeof window !== "undefined" &&
+  window.location &&
+  window.location.search.includes("mirror")
+) {
+  isMirror = true;
+  if (!mirrorSocket) {
+    // You may want to make the port/path configurable
+    const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const wsPort = 65434; // Should match REDUX_MIRROR_WS_PORT
+    const wsPath = "/mirror"; // Should match REDUX_MIRROR_WS_PATH
+    mirrorSocket = new window.WebSocket(
+      `${wsProtocol}://localhost:${wsPort}${wsPath}`,
+    );
+  }
+}
 
 interface vscode {
   postMessage(message: any): vscode;
@@ -80,6 +101,22 @@ export class IdeMessenger implements IIdeMessenger {
     data: any,
     messageId: string = uuidv4(),
   ) {
+    // Mirror mode: send via WebSocket
+    if (
+      isMirror &&
+      mirrorSocket &&
+      mirrorSocket.readyState === window.WebSocket.OPEN
+    ) {
+      const msg: Message = {
+        messageId,
+        messageType,
+        data,
+      };
+      mirrorSocket.send(JSON.stringify(msg));
+      return;
+    }
+
+    // JetBrains IDE support
     if (typeof vscode === "undefined") {
       if (isJetBrains()) {
         if (window.postIntellijMessage === undefined) {
@@ -102,12 +139,12 @@ export class IdeMessenger implements IIdeMessenger {
       }
     }
 
+    // Default: VS Code webview
     const msg: Message = {
       messageId,
       messageType,
       data,
     };
-
     vscode.postMessage(msg);
   }
 

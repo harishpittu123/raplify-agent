@@ -1,5 +1,23 @@
+// Monaco worker loader for Chrome extension/custom environments
+// Use blob URLs for workers to support strict CSP and extension environments
+// if (typeof window !== "undefined") {
+//   // @ts-ignore
+//   window.MonacoEnvironment = window.MonacoEnvironment || {
+//     getWorkerUrl: function (_moduleId, label) {
+//       let workerScript = '';
+//       if (label === "typescript" || label === "javascript") {
+//         workerScript = `importScripts("${location.origin}/ts.worker.js");`;
+//       } else {
+//         workerScript = `importScripts("${location.origin}/editor.worker.js");`;
+//       }
+//       const blob = new Blob([workerScript], { type: "application/javascript" });
+//       return URL.createObjectURL(blob);
+//     },
+//   };
+// }
 import * as monaco from "monaco-editor";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useWebSocketContext } from "../context/WebSocketContext";
 import "../styles/editor.css";
 import { getSetiIcon } from "../utils/setiIconLoader";
 import { ChevronArrow } from "./ChevronArrow";
@@ -37,50 +55,78 @@ interface EditorProps {
 }
 
 export function Editor({ filePath, fileName, content }: EditorProps) {
+  const { sendMessage } = useWebSocketContext();
   const editorRef = useRef<HTMLDivElement>(null);
   const monacoEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(
     null,
   );
+  const [editorValue, setEditorValue] = useState(content || "");
+  const [dirty, setDirty] = useState(false);
 
-  // Create editor on mount
+  // Initialize Monaco Editor
   useEffect(() => {
     if (!editorRef.current) return;
-    monacoEditorRef.current = monaco.editor.create(editorRef.current, {
-      value: content || "",
-      language: "typescript",
-      theme: "vs-dark",
-      readOnly: false,
-      minimap: { enabled: false },
-      fontSize: 13,
-      fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace',
-      fontLigatures: true,
-      scrollBeyondLastLine: false,
-      automaticLayout: true,
-    });
+    let editor: monaco.editor.IStandaloneCodeEditor;
+    let changeListener: monaco.IDisposable;
+    try {
+      editor = monaco.editor.create(editorRef.current, {
+        value: content || "",
+        language: "typescript",
+        theme: "vs-dark",
+        readOnly: false,
+        minimap: { enabled: false },
+        fontSize: 13,
+        fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace',
+        fontLigatures: true,
+        scrollBeyondLastLine: false,
+        automaticLayout: true,
+      });
+      monacoEditorRef.current = editor;
+      const model = editor.getModel();
+      changeListener = editor.onDidChangeModelContent(() => {
+        const value = editor.getValue();
+        setEditorValue(value);
+        setDirty(value !== content);
+      });
+    } catch (error) {
+      console.error("####Error initializing Monaco Editor:", error);
+    }
     return () => {
-      monacoEditorRef.current?.dispose();
+      changeListener.dispose();
+      editor.dispose();
+      monacoEditorRef.current = null;
     };
-    // Only run on mount/unmount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Update editor content when file changes
+  // Update Monaco value when file changes
   useEffect(() => {
     if (monacoEditorRef.current) {
       const model = monacoEditorRef.current.getModel();
       if (model && content !== model.getValue()) {
         monacoEditorRef.current.setValue(content || "");
+        setEditorValue(content || "");
+        setDirty(false);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content, filePath]);
 
-  // Breadcrumbs logic: show workspace folder to file name, separated by chevron
-  let breadcrumbs: React.ReactNode = filePath || "No file selected";
-  if (filePath) {
-    // Split path into segments
+  // Save handler
+  const handleSave = () => {
+    if (!filePath) return;
+    sendMessage({
+      type: "SAVE_FILE_CONTENT",
+      payload: { filePath, content: editorValue },
+    });
+    setDirty(false);
+  };
+
+  // Breadcrumbs UI
+  const renderBreadcrumbs = () => {
+    if (!filePath) return "No file selected";
     const segments = filePath.split(/[/\\]/).filter(Boolean);
-    breadcrumbs = segments.map((seg, idx) => {
-      // Only show icon for last segment (file)
+    return segments.map((seg, idx) => {
       const isLast = idx === segments.length - 1;
       return (
         <span
@@ -110,7 +156,8 @@ export function Editor({ filePath, fileName, content }: EditorProps) {
         </span>
       );
     });
-  }
+  };
+
   return (
     <div className="editor-container">
       <div
@@ -125,7 +172,12 @@ export function Editor({ filePath, fileName, content }: EditorProps) {
           background: "#232323",
         }}
       >
-        {breadcrumbs}
+        {renderBreadcrumbs()}
+        {dirty && (
+          <button onClick={handleSave} style={{ marginLeft: 12 }}>
+            Save
+          </button>
+        )}
       </div>
       <div className="editor-content" ref={editorRef} />
     </div>
